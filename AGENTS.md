@@ -38,7 +38,10 @@ The plugin never changes providers; disabling it restores the original icons.
    current bb. Re-check after a bb upgrade.
 4. **Runtime-shimmed packages stay devDependencies.** React, Radix, sonner and
    vaul are provided by the host; only zod and `@radix-ui/react-slot` ship in
-   the bundle.
+   the bundle. `@get-bb/plugin-sdk` stays in `dependencies`: `src/shared/contract.ts`
+   imports `defineRpcContract` from the SDK root, and Git installs run `npm install --omit=dev`, so a
+   devDependency SDK breaks `bb plugin install git:...`. `bb plugin types
+   --check` catches this.
 5. **UI text is English by default.** Russian lives in the string tables
    (`src/server/strings.ts`, `src/app/strings.ts`, `src/shared/i18n.ts`) and
    `ru` is typed as `typeof en`. Static registrations (section title, setting
@@ -46,7 +49,7 @@ The plugin never changes providers; disabling it restores the original icons.
 
 ## Commands
 
-- Check: `npm ci && npm run typecheck && npm test && npm run build`.
+- Check: `npm ci && npm run typecheck && npm test && npm run build && bb plugin types --check`.
 - Live test from the checkout: `npm run build && bb plugin install "$PWD" --yes`,
   then open `/settings/plugins/agent-icons` or run `bb agent-icons list`.
 - App tests need `// @vitest-environment jsdom` and `cleanup()` in `afterEach`

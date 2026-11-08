@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-agent-icons",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Give each BB agent provider its own icon and colour: built-in glyphs or your own SVG sets, synced across devices.",
   "private": true,
   "type": "module",
@@ -29,11 +29,11 @@
     "app": "./app.tsx"
   },
   "dependencies": {
+    "@get-bb/plugin-sdk": "0.6.132",
     "@radix-ui/react-slot": "^1.5.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.6.132",
     "@pierre/diffs": "~1.2.12",
     "@radix-ui/react-alert-dialog": "^1.2.1",
     "@radix-ui/react-context-menu": "^2.4.1",
