@@ -14,18 +14,18 @@ describe("assignments", () => {
   it("rejects unknown builtins, sets and icons", async () => {
     const t = await setup();
     await expect(t.call("assign", { providerId: "acp-beta", source: { builtin: "Wrench" } })).rejects.toThrow(
-      /встроенного значка Wrench нет/,
+      /there is no built-in icon Wrench/,
     );
     await expect(t.call("assign", { providerId: "acp-beta", source: { set: "nope", icon: "x" } })).rejects.toThrow(
-      /набор не найден/,
+      /set not found/,
     );
     const setId = await t.createSet("Team");
     await expect(t.call("assign", { providerId: "acp-beta", source: { set: setId, icon: "x" } })).rejects.toThrow(
-      /иконка не найдена/,
+      /icon not found in the set/,
     );
     await expect(
       t.call("assign", { providerId: "acp-beta", source: { set: setId, icon: "constructor" } }),
-    ).rejects.toThrow(/иконка не найдена/);
+    ).rejects.toThrow(/icon not found in the set/);
     expect((await t.state()).assignments).toEqual({});
   });
 
@@ -63,7 +63,7 @@ describe("sets", () => {
       { fileName: "bad.svg", text: '<svg viewBox="0 0 1 1"><image href="x"/></svg>' },
     ]);
     expect(result.accepted).toEqual([{ fileName: "Alpha.svg", iconId: "alpha", name: "Alpha" }]);
-    expect(result.rejected).toEqual([{ fileName: "bad.svg", reason: "нет фигур" }]);
+    expect(result.rejected).toEqual([{ fileName: "bad.svg", reason: "no shapes" }]);
     expect((await t.state()).sets).toMatchObject([{ id: setId, name: "Team", iconCount: 1 }]);
   });
 
@@ -83,7 +83,29 @@ describe("sets", () => {
   it("refuses duplicate set names regardless of case", async () => {
     const t = await setup();
     await t.createSet("Team");
-    await expect(t.createSet("team")).rejects.toThrow(/уже есть/);
+    await expect(t.createSet("team")).rejects.toThrow(/already exists/);
+  });
+
+  it("compares names ignoring case for Latin and Cyrillic", async () => {
+    const t = await setup();
+    await t.createSet("Команда");
+    await expect(t.createSet("команда")).rejects.toThrow(/already exists/);
+    await t.createSet("Team");
+    await expect(t.createSet("TEAM")).rejects.toThrow(/already exists/);
+    const setId = (await t.state()).sets.find((s) => s.name === "Team")!.id;
+    await t.upload(setId, [{ fileName: "Бот.svg", text: tinySvg(1) }]);
+    const again = await t.upload(setId, [{ fileName: "бот.svg", text: tinySvg(2) }]);
+    expect(again.accepted).toHaveLength(1);
+    expect((await t.state()).sets.find((s) => s.id === setId)!.iconCount).toBe(1);
+  });
+
+  it("refuses an existing set name in English by default and in Russian on request", async () => {
+    const en = await setup();
+    await en.createSet("Team");
+    await expect(en.createSet("Team")).rejects.toThrow('set "Team" already exists');
+    const ru = await setup([], { language: "ru" });
+    await ru.createSet("Team");
+    await expect(ru.createSet("Team")).rejects.toThrow("набор «Team» уже есть");
   });
 
   it("deletes a set with its assignments and names the affected providers (AE3)", async () => {
@@ -118,7 +140,7 @@ describe("sets", () => {
     const again = await t.upload(setId, [{ fileName: "bot.svg", text: tinySvg(2) }]);
     expect(again.accepted[0]?.iconId).toBe("bot");
     await t.upload(setId, [{ fileName: "Robot.svg", text: tinySvg(3) }]);
-    await expect(t.call("renameIcon", { setId, iconId: "robot", name: "BOT" })).rejects.toThrow(/уже есть иконка/);
+    await expect(t.call("renameIcon", { setId, iconId: "robot", name: "BOT" })).rejects.toThrow(/already has an icon/);
     const { icons } = await t.call<{ icons: { id: string; name: string }[] }>("setIcons", { setId });
     expect(icons.map((i) => [i.id, i.name]).sort()).toEqual([
       ["bot", "bot"],
@@ -175,7 +197,7 @@ describe("sets", () => {
     const state = await t.state();
     expect(state.sets[0]!.bytes).toBeGreaterThan(256 * 1024);
     expect(state.totalBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
-    expect(refusal).toMatch(/нет места: занято \d+,\d из 2,0 МБ/);
+    expect(refusal).toMatch(/no space: \d+\.\d of 2\.0 MB used/);
     const before = await t.state();
     await t.upload(setId, [{ fileName: "more.svg", text: bulkySvg(30, 999) }]);
     expect(await t.state()).toEqual(before);

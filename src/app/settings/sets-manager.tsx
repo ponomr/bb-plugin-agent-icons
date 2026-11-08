@@ -3,9 +3,11 @@ import { experimental_useRpcMutation, experimental_useRpcQuery } from "@get-bb/p
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { iconsContract, type IconsState, type SetSummary } from "../../shared/contract";
-import { formatMegabytes, MAX_TOTAL_BYTES } from "../../shared/limits";
+import { formatMegabytes } from "../../shared/i18n";
+import { MAX_TOTAL_BYTES } from "../../shared/limits";
 import { renderTree } from "../render-tree";
 import type { ProviderRecord } from "../store";
+import { useLanguage, useStrings } from "../strings";
 import { ConfirmDelete, type DeleteRequest } from "./confirm-dialog";
 import { affectedProviders, errorMessage, fileBaseName, planUpload, providerName, type PickedFile } from "./model";
 
@@ -21,13 +23,14 @@ function toPicked(list: FileList | null): PickedFile[] {
 }
 
 function useUpload() {
+  const language = useLanguage();
   const createSet = experimental_useRpcMutation({ contract: iconsContract, method: "createSet" });
   const uploadIcons = experimental_useRpcMutation({ contract: iconsContract, method: "uploadIcons" });
   const [pending, setPending] = useState(false);
   const [report, setReport] = useState<UploadReport | null>(null);
 
   const run = async (files: PickedFile[], target: { setId: string; name: string } | { newName: string }) => {
-    const plan = planUpload(files);
+    const plan = planUpload(files, language);
     const setName = "setId" in target ? target.name : target.newName;
     const next: UploadReport = { setName, accepted: 0, rejected: [...plan.tooLarge] };
     setPending(true);
@@ -42,7 +45,7 @@ function useUpload() {
         next.rejected.push(...result.rejected);
       }
     } catch (cause) {
-      next.error = errorMessage(cause);
+      next.error = errorMessage(cause, language);
     } finally {
       setPending(false);
       setReport(next);
@@ -53,12 +56,13 @@ function useUpload() {
 }
 
 function UploadSummary({ report }: { report: UploadReport }) {
+  const s = useStrings();
   return (
     <div className="rounded-md border border-border p-3 text-sm" role="status">
       <p>
-        Набор «{report.setName}»: принято {report.accepted}, отклонено {report.rejected.length}
+        {s.uploadSummary(report.setName, report.accepted, report.rejected.length)}
       </p>
-      {report.error ? <p className="text-destructive">Загрузка прервана: {report.error}</p> : null}
+      {report.error ? <p className="text-destructive">{s.uploadInterrupted(report.error)}</p> : null}
       {report.rejected.length > 0 ? (
         <ul className="mt-1 list-disc pl-5 text-muted-foreground">
           {report.rejected.map((r, i) => (
@@ -98,6 +102,8 @@ function FilePicker({ label, disabled, onFiles }: { label: string; disabled?: bo
 
 /** Click to rename; saves on Enter or blur, Escape cancels. */
 function EditableName({ value, label, onSave }: { value: string; label: string; onSave: (name: string) => Promise<unknown> }) {
+  const language = useLanguage();
+  const s = useStrings();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(value);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +120,7 @@ function EditableName({ value, label, onSave }: { value: string; label: string; 
       setError(null);
       setEditing(false);
     } catch (cause) {
-      setError(errorMessage(cause));
+      setError(errorMessage(cause, language));
     }
   };
 
@@ -123,7 +129,7 @@ function EditableName({ value, label, onSave }: { value: string; label: string; 
       <button
         type="button"
         className="min-h-9 truncate rounded px-1 text-left text-sm hover:bg-accent"
-        aria-label={`${label}: ${value}`}
+        aria-label={s.nameOf(label, value)}
         onClick={() => {
           setText(value);
           setEditing(true);
@@ -167,6 +173,8 @@ function SetIcons({
   providers: readonly ProviderRecord[];
   onDelete: (request: DeleteRequest) => void;
 }) {
+  const s = useStrings();
+  const language = useLanguage();
   const query = experimental_useRpcQuery({ contract: iconsContract, method: "setIcons", input: { setId: set.id } });
   const renameIcon = experimental_useRpcMutation({ contract: iconsContract, method: "renameIcon" });
   const deleteIcon = experimental_useRpcMutation({ contract: iconsContract, method: "deleteIcon" });
@@ -174,15 +182,15 @@ function SetIcons({
   if (query.error && !query.data) {
     return (
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-destructive">Не удалось загрузить: {errorMessage(query.error)}</span>
+        <span className="text-destructive">{s.loadItemFailed(errorMessage(query.error, language))}</span>
         <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
-          Повторить
+          {s.retry}
         </Button>
       </div>
     );
   }
-  if (!query.data) return <p className="text-sm text-muted-foreground">Загрузка…</p>;
-  if (query.data.icons.length === 0) return <p className="text-sm text-muted-foreground">В наборе нет иконок</p>;
+  if (!query.data) return <p className="text-sm text-muted-foreground">{s.loading}</p>;
+  if (query.data.icons.length === 0) return <p className="text-sm text-muted-foreground">{s.setEmpty}</p>;
 
   return (
     <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
@@ -194,23 +202,23 @@ function SetIcons({
           <div className="min-w-0 flex-1">
             <EditableName
               value={icon.name}
-              label="Имя иконки"
+              label={s.iconName}
               onSave={(name) => renameIcon.mutate({ setId: set.id, iconId: icon.id, name })}
             />
           </div>
           <Button
             variant="ghost"
             size="sm"
-            aria-label={`Удалить иконку ${icon.name}`}
+            aria-label={s.deleteIconOf(icon.name)}
             onClick={() =>
               onDelete({
-                title: `Удалить иконку «${icon.name}»?`,
+                title: s.deleteIconTitle(icon.name),
                 affected: affectedProviders(state, set.id, icon.id).map((id) => providerName(providers, id)),
                 run: () => deleteIcon.mutate({ setId: set.id, iconId: icon.id }),
               })
             }
           >
-            Удалить
+            {s.delete}
           </Button>
         </li>
       ))}
@@ -229,6 +237,7 @@ function SetCard({
   providers: readonly ProviderRecord[];
   onDelete: (request: DeleteRequest) => void;
 }) {
+  const s = useStrings();
   const [open, setOpen] = useState(false);
   const renameSet = experimental_useRpcMutation({ contract: iconsContract, method: "renameSet" });
   const deleteSet = experimental_useRpcMutation({ contract: iconsContract, method: "deleteSet" });
@@ -238,32 +247,32 @@ function SetCard({
     <li className="flex flex-col gap-2 py-3" data-testid={`set-${set.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-0 flex-1">
-          <EditableName value={set.name} label="Имя набора" onSave={(name) => renameSet.mutate({ setId: set.id, name })} />
+          <EditableName value={set.name} label={s.setName} onSave={(name) => renameSet.mutate({ setId: set.id, name })} />
           <div className="px-1 text-xs text-muted-foreground">
-            {set.iconCount} икон. · {Math.ceil(set.bytes / 1024)} КБ
+            {s.setCount(set.iconCount, Math.ceil(set.bytes / 1024))}
           </div>
         </div>
         <Button variant="ghost" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? "Скрыть" : "Иконки"}
+          {open ? s.hide : s.show}
         </Button>
         <FilePicker
-          label={upload.pending ? "Загрузка…" : "Добавить файлы"}
+          label={upload.pending ? s.uploading : s.addFiles}
           disabled={upload.pending}
           onFiles={(files) => void upload.run(files, { setId: set.id, name: set.name })}
         />
         <Button
           variant="ghost"
           size="sm"
-          aria-label={`Удалить набор ${set.name}`}
+          aria-label={s.deleteSetOf(set.name)}
           onClick={() =>
             onDelete({
-              title: `Удалить набор «${set.name}»?`,
+              title: s.deleteSetTitle(set.name),
               affected: affectedProviders(state, set.id).map((id) => providerName(providers, id)),
               run: () => deleteSet.mutate({ setId: set.id }),
             })
           }
         >
-          Удалить
+          {s.delete}
         </Button>
       </div>
       {upload.report ? <UploadSummary report={upload.report} /> : null}
@@ -273,6 +282,8 @@ function SetCard({
 }
 
 export function SetsManager({ state, providers }: { state: IconsState; providers: readonly ProviderRecord[] }) {
+  const s = useStrings();
+  const language = useLanguage();
   const [name, setName] = useState("");
   const [request, setRequest] = useState<DeleteRequest | null>(null);
   const upload = useUpload();
@@ -280,30 +291,29 @@ export function SetsManager({ state, providers }: { state: IconsState; providers
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted-foreground">
-        Занято {formatMegabytes(state.totalBytes)} из {formatMegabytes(MAX_TOTAL_BYTES)} МБ. Только SVG, до 32 КБ на файл
-        и 200 иконок в наборе; иконки одноцветные.
+        {s.usage(formatMegabytes(state.totalBytes, language), formatMegabytes(MAX_TOTAL_BYTES, language))}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Input
           className="max-w-xs"
-          aria-label="Имя нового набора"
-          placeholder="Имя набора (иначе по первому файлу)"
+          aria-label={s.newSetName}
+          placeholder={s.newSetPlaceholder}
           value={name}
           maxLength={80}
           onChange={(e) => setName(e.target.value)}
         />
         <FilePicker
-          label={upload.pending ? "Загрузка…" : "Загрузить набор"}
+          label={upload.pending ? s.uploading : s.uploadSet}
           disabled={upload.pending}
           onFiles={(files) => {
-            const newName = name.trim() || fileBaseName(files[0]!.fileName) || "Набор";
+            const newName = name.trim() || fileBaseName(files[0]!.fileName) || s.defaultSetName;
             void upload.run(files, { newName }).then(() => setName(""));
           }}
         />
       </div>
       {upload.report ? <UploadSummary report={upload.report} /> : null}
       {state.sets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Наборов нет</p>
+        <p className="text-sm text-muted-foreground">{s.noSets}</p>
       ) : (
         <ul className="divide-y divide-border">
           {state.sets.map((set) => (

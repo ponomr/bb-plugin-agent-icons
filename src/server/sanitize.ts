@@ -1,8 +1,9 @@
 /**
  * Turns uploaded SVG text into a safe monochrome tree or a typed refusal with
- * a Russian reason the settings page and CLI show as is.
+ * a reason, in the configured language, that the settings page and CLI show as is.
  */
-import { MAX_FILE_BYTES, tooLargeReason } from "../shared/limits";
+import { DEFAULT_LANGUAGE, tooLargeReason, type Language } from "../shared/i18n";
+import { MAX_FILE_BYTES } from "../shared/limits";
 import {
   countShapes,
   isAllowedAttribute,
@@ -15,6 +16,7 @@ import {
   validateTree,
   type SvgNode,
 } from "../shared/svg-allowlist";
+import { strings } from "./strings";
 import { parseXml, XmlParseError, type XmlElement } from "./xml";
 
 export type SanitizeFailureCode = "too_large" | "parse_error" | "not_svg" | "no_viewbox" | "no_shapes";
@@ -60,23 +62,24 @@ function fail(code: SanitizeFailureCode, reason: string): SanitizeResult {
   return { ok: false, code, reason };
 }
 
-export function sanitizeSvg(text: string): SanitizeResult {
+export function sanitizeSvg(text: string, language: Language = DEFAULT_LANGUAGE): SanitizeResult {
+  const t = strings(language);
   const size = utf8Bytes(text);
-  if (size > MAX_FILE_BYTES) return fail("too_large", tooLargeReason(size));
+  if (size > MAX_FILE_BYTES) return fail("too_large", tooLargeReason(size, language));
 
   let root: XmlElement;
   try {
     root = parseXml(text);
   } catch (cause) {
     if (cause instanceof XmlParseError) {
-      return fail("parse_error", `не удалось разобрать SVG: ${cause.message}`);
+      return fail("parse_error", t.parseFailed(cause.message));
     }
     throw cause;
   }
-  if (root.name !== "svg") return fail("not_svg", "корневой элемент не svg");
+  if (root.name !== "svg") return fail("not_svg", t.rootNotSvg);
 
   const tree = convert(root);
-  if (!tree) return fail("not_svg", "корневой элемент не svg");
+  if (!tree) return fail("not_svg", t.rootNotSvg);
 
   const rest = { ...tree.attrs };
   delete rest.width;
@@ -84,14 +87,14 @@ export function sanitizeSvg(text: string): SanitizeResult {
   if (!rest.viewBox) {
     const w = lengthOf(root.attrs.find(([n]) => n === "width")?.[1]);
     const h = lengthOf(root.attrs.find(([n]) => n === "height")?.[1]);
-    if (w === null || h === null) return fail("no_viewbox", "нет viewBox и числовых width и height");
+    if (w === null || h === null) return fail("no_viewbox", t.noViewBox);
     rest.viewBox = `0 0 ${w} ${h}`;
   }
   if (!rest.fill) rest.fill = "currentColor";
   tree.attrs = rest;
 
   const checked = validateTree(tree);
-  if (!checked) return fail("parse_error", "не удалось разобрать SVG: дерево не прошло проверку");
-  if (countShapes(checked) === 0) return fail("no_shapes", "нет фигур");
+  if (!checked) return fail("parse_error", t.treeInvalid);
+  if (countShapes(checked) === 0) return fail("no_shapes", t.noShapes);
   return { ok: true, tree: checked, bytes: treeBytes(checked) };
 }

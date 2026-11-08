@@ -10,10 +10,13 @@ The plugin never changes providers; disabling it restores the original icons.
 - `server.ts` — wires the store, RPC contract and CLI.
 - `src/server/` — `xml.ts` (strict XML reader), `sanitize.ts` (SVG → safe
   monochrome tree), `state.ts` (`IconStore`: KV layout, limits, RPC handlers),
-  `cli.ts` (`bb agent-icons list|assign|clear|import-set`).
-- `src/shared/` — RPC contract, limits, SVG allowlist, built-in icon names.
-- `src/app/` — provider-icon marks, the state overlay, tree rendering, and
-  `settings/` (the «Иконки агентов» settings section).
+  `cli.ts` (`bb agent-icons list|assign|clear|import-set`), `strings.ts`
+  (server and CLI text, `en` + `ru`).
+- `src/shared/` — RPC contract, limits, SVG allowlist, built-in icon names,
+  `i18n.ts` (language type and shared helpers).
+- `src/app/` — provider-icon marks, the state overlay, tree rendering,
+  `strings.ts` (UI text, `en` + `ru`), and `settings/` (the "Agent icons"
+  settings section).
 - `components/`, `lib/`, `hooks/` — vendored BB UI components; import them by
   relative path and keep them unchanged.
 - `icon-sets/` — curated Tabler, Lucide and Phosphor sets: theme list,
@@ -36,7 +39,10 @@ The plugin never changes providers; disabling it restores the original icons.
 4. **Runtime-shimmed packages stay devDependencies.** React, Radix, sonner and
    vaul are provided by the host; only zod and `@radix-ui/react-slot` ship in
    the bundle.
-5. **UI text is Russian**; code, comments and docs are English.
+5. **UI text is English by default.** Russian lives in the string tables
+   (`src/server/strings.ts`, `src/app/strings.ts`, `src/shared/i18n.ts`) and
+   `ru` is typed as `typeof en`. Static registrations (section title, setting
+   label, CLI help) are English only. Code, comments and docs are English.
 
 ## Commands
 
@@ -70,6 +76,9 @@ The plugin never changes providers; disabling it restores the original icons.
   appear under Settings → Mobile, so the plugin has one section.
 - `Wrench` and `Feather` are not drawn by `experimental_Icon`; they are
   excluded from `BUILTIN_ICONS`.
+- The SDK exposes no locale (no language in `AppSettings`, no locale hook), so
+  the language is the `language` plugin setting (`en` default, `ru`), returned
+  in the RPC `state`; changing it invalidates the `icons` tag.
 - XML parser: our own dependency-free reader (`src/server/xml.ts`). It rejects
   DOCTYPE and custom entities, ignores text and CDATA, and caps depth (32) and
   node count (2000). No third-party parser met the "pure JS, no DOM, no native

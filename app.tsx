@@ -11,8 +11,8 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "icons-state", component: IconsOverlay });
   app.slots.settingsSection({
     id: "icons",
-    title: "Иконки агентов",
-    description: "Своя иконка и цвет для каждого провайдера. Назначения общие для всех устройств.",
+    title: "Agent icons",
+    description: "An icon and a colour for each provider. Assignments are shared by all devices.",
     component: SettingsSection,
   });
 });

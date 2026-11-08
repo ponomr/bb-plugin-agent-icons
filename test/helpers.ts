@@ -16,10 +16,14 @@ export function bulkySvg(kb: number, seed = 0): string {
   return `<svg viewBox="0 0 1000 1000"><path d="M0 0 ${segments.join("")}z"/></svg>`;
 }
 
-export async function setup(providers: { id: string; displayName: string }[] = []) {
+export async function setup(
+  providers: { id: string; displayName: string }[] = [],
+  settings?: Record<string, string>,
+) {
   const { bb, harness } = createFakePluginHost({
     pluginId: "agent-icons",
     sdk: { providers: { list: async () => providers } },
+    settings,
   });
   await plugin(bb);
   const call = <T>(method: string, input: unknown = null) => harness.behavior.callRpc(method, input) as Promise<T>;

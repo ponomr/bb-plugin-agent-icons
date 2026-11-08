@@ -12,4 +12,4 @@ Assignments are stored on the BB server, so your Mac and your phone show the sam
 
 ## Getting started
 
-Open the plugin's settings page, press **Изменить** next to a provider, pick an icon and optional colours, and save. The `bb agent-icons` command does the same from a terminal and can import a folder of SVG files as a set. Requires BB 0.49.0 or later, below 1.0.
+Open the plugin's settings page, press **Change** next to a provider, pick an icon and optional colours, and save. The `bb agent-icons` command does the same from a terminal and can import a folder of SVG files as a set. Requires BB 0.49.0 or later, below 1.0. The interface is English by default; Russian is available through the `language` plugin setting.
