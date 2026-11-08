@@ -1,0 +1,190 @@
+# people & roles
+user
+users
+user-circle circle-user user-circle-gear
+user-plus
+user-check user-circle-check
+user-cog user-gear user-circle-gear
+users-group users-three users-round
+face-id smiley scan-face
+mood-smile smile smiley
+id-badge identification-badge contact
+address-book book-user
+robot bot
+bot-message-square robot-face chat-teardrop-dots
+brain
+headset headphones
+# AI & magic
+sparkles sparkle
+wand wand-sparkles magic-wand
+bulb lightbulb
+atom
+# tools & making
+tool wrench
+hammer
+screwdriver
+tools toolbox
+settings gear
+adjustments sliders sliders-horizontal
+paint-brush paintbrush brush
+palette
+pencil pencil-simple
+pen-nib pen-tool pen ballpen
+feather
+# documents & knowledge
+file
+file-text
+files copy
+file-search file-magnifying-glass
+file-check seal-check
+file-code
+folder
+folder-open
+archive
+book
+book-open book-2
+books library
+notebook
+notes note sticky-note note-pencil
+clipboard
+clipboard-list clipboard-text
+clipboard-check check-square
+list-check checks list-checks
+checklist list-todo
+bookmark
+paperclip
+newspaper news
+presentation presentation-chart
+table
+# time
+calendar
+calendar-event calendar-check calendar-days
+calendar-plus
+clock
+alarm alarm-clock
+hourglass
+stopwatch timer
+# communication
+mail envelope
+mail-opened envelope-open mail-open
+inbox tray
+send paper-plane-tilt
+message chat-circle message-circle
+messages chats messages-square
+message-dots chat-dots message-circle-more
+speakerphone megaphone
+bell
+phone
+phone-call
+video video-camera
+microphone mic
+share share-network share-2
+link
+world globe
+# code & tech
+code
+terminal terminal-window
+terminal-2 terminal square-terminal
+brackets-curly braces code-xml
+git-branch
+git-merge
+git-pull-request
+database
+server hard-drives
+cloud
+cpu
+device-laptop laptop
+device-desktop desktop monitor
+device-mobile phone-mobile smartphone
+api plugs-connected webhook
+bug
+package
+# money & business
+currency-dollar dollar-sign
+coin coins
+wallet
+credit-card
+receipt
+report-money invoice receipt-text
+chart-bar chart-column
+chart-line chart-line-up
+chart-pie
+trending-up trend-up
+briefcase
+building buildings
+building-store storefront store
+shopping-cart
+calculator
+scale scales
+gavel
+handshake heart-handshake
+target
+award medal
+trophy
+crown
+diamond gem
+gift
+# security
+shield
+shield-check
+lock
+lock-open unlock
+key
+fingerprint
+eye
+eye-off eye-slash
+search magnifying-glass
+# places & travel
+home house
+map map-trifold
+map-pin
+compass
+plane airplane
+car
+rocket
+flag
+# health & life
+heart
+heartbeat activity heart-pulse
+pill
+stethoscope
+first-aid-kit first-aid briefcase-medical
+run person-simple-run person-standing
+barbell dumbbell
+coffee
+tea-cup cup-soda mug-hot cup tea-bag
+# learning & media
+school graduation-cap
+certificate
+music music-note
+headphones
+camera
+photo image
+movie film-strip film
+microphone-2 microphone-stage mic-vocal
+# nature
+sun
+moon
+flame fire
+bolt lightning zap
+leaf
+plant plant-pot
+tree tree-deciduous
+flower
+seedling sprout plant-2 flower-tulip
+planet orbit
+star
+# animals
+cat
+dog
+paw paw-print
+bird
+fish
+# misc
+puzzle puzzle-piece
+anchor
+bell-ringing bell-ring
+flask flask-conical
+microscope
+test-pipe test-tube
+ghost

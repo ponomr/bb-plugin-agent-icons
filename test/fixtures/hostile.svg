@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" onload="alert(1)">
+  <script>alert(1)</script>
+  <style>path { fill: url(https://evil.example/x) }</style>
+  <foreignObject width="10" height="10"><div xmlns="http://www.w3.org/1999/xhtml">x</div></foreignObject>
+  <use href="#a"/>
+  <image href="https://evil.example/pixel.png" width="1" height="1"/>
+  <a xlink:href="javascript:alert(1)"><path d="M0 0h1v1z"/></a>
+  <circle cx="12" cy="12" r="5" onclick="alert(1)" fill="url(#grad)" style="fill:url(https://evil.example/x)" stroke="red"/>
+</svg>
