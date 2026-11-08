@@ -8,14 +8,3 @@ export const UPLOAD_BATCH_BYTES = 1024 * 1024;
 
 export const MAX_TREE_DEPTH = 32;
 export const MAX_TREE_NODES = 2000;
-
-export function tooLargeReason(size: number): string {
-  return `файл больше ${MAX_FILE_BYTES / 1024} КБ (${Math.ceil(size / 1024)} КБ)`;
-}
-
-export function formatMegabytes(bytes: number): string {
-  return (bytes / (1024 * 1024)).toLocaleString("ru-RU", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
-}

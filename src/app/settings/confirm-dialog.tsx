@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../components/ui/dialog";
+import { useLanguage, useStrings } from "../strings";
 import { errorMessage } from "./model";
 
 export interface DeleteRequest {
@@ -19,6 +20,8 @@ export interface DeleteRequest {
 
 /** One confirmation for deleting an icon or a set; names the providers it affects. */
 export function ConfirmDelete({ request, onClose }: { request: DeleteRequest | null; onClose: () => void }) {
+  const s = useStrings();
+  const language = useLanguage();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +33,7 @@ export function ConfirmDelete({ request, onClose }: { request: DeleteRequest | n
       await request.run();
       onClose();
     } catch (cause) {
-      setError(errorMessage(cause));
+      setError(errorMessage(cause, language));
     } finally {
       setPending(false);
     }
@@ -51,21 +54,21 @@ export function ConfirmDelete({ request, onClose }: { request: DeleteRequest | n
           <DialogTitle>{request?.title}</DialogTitle>
           <DialogDescription>
             {request && request.affected.length > 0
-              ? `Исходную иконку получат: ${request.affected.join(", ")}.`
-              : "Ни один провайдер эту иконку не использует."}
+              ? s.affectedGetOriginal(request.affected.join(", "))
+              : s.noProviderUsesIcon}
           </DialogDescription>
         </DialogHeader>
         {error ? (
           <p role="alert" className="text-sm text-destructive">
-            Не удалено: {error}
+            {s.notDeleted(error)}
           </p>
         ) : null}
         <DialogFooter>
           <Button variant="outline" disabled={pending} onClick={onClose}>
-            Отмена
+            {s.cancel}
           </Button>
           <Button variant="destructive" disabled={pending} onClick={() => void confirm()}>
-            {pending ? "Удаление…" : error ? "Повторить" : "Удалить"}
+            {pending ? s.deleting : error ? s.retry : s.delete}
           </Button>
         </DialogFooter>
       </DialogContent>

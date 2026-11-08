@@ -21,6 +21,7 @@ import { renderTree } from "../render-tree";
 import type { ProviderRecord } from "../store";
 import { IconGrid, type GridItem } from "./icon-grid";
 import { errorMessage } from "./model";
+import { useLanguage, useStrings } from "../strings";
 import { TintEditor } from "./tint-editor";
 
 const BUILTIN_TAB = "builtin";
@@ -39,6 +40,8 @@ function SetTab({
   selected: string | undefined;
   onPick: (iconId: string, name: string, tree: unknown) => void;
 }) {
+  const s = useStrings();
+  const language = useLanguage();
   const query = experimental_useRpcQuery({ contract: iconsContract, method: "setIcons", input: { setId } });
   const items = useMemo<GridItem[]>(
     () =>
@@ -52,19 +55,19 @@ function SetTab({
   if (query.error && !query.data) {
     return (
       <div className="flex flex-col items-center gap-2 py-6 text-sm">
-        <p className="text-destructive">Не удалось загрузить набор: {errorMessage(query.error)}</p>
+        <p className="text-destructive">{s.setLoadFailed(errorMessage(query.error, language))}</p>
         <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
-          Повторить
+          {s.retry}
         </Button>
       </div>
     );
   }
-  if (!query.data) return <p className="py-6 text-center text-sm text-muted-foreground">Загрузка…</p>;
+  if (!query.data) return <p className="py-6 text-center text-sm text-muted-foreground">{s.loading}</p>;
   return (
     <IconGrid
       items={items}
       selected={selected}
-      empty="В наборе нет иконок"
+      empty={s.setEmpty}
       onSelect={(item) => {
         const icon = query.data?.icons.find((i) => i.id === item.id);
         if (icon) onPick(icon.id, icon.name, icon.tree);
@@ -90,6 +93,8 @@ export function IconPicker({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const s = useStrings();
+  const language = useLanguage();
   const current = state.assignments[provider.id];
   const [source, setSource] = useState<IconSource | undefined>(current?.source);
   const [tint, setTint] = useState<Tint>(current?.tint ?? {});
@@ -127,17 +132,17 @@ export function IconPicker({
   };
 
   const name = provider.displayName ?? provider.id;
-  const tabs = [{ id: BUILTIN_TAB, name: "Встроенные" }, ...state.sets.map((s) => ({ id: s.id, name: s.name }))];
+  const tabs = [{ id: BUILTIN_TAB, name: s.builtinTab }, ...state.sets.map((s) => ({ id: s.id, name: s.name }))];
 
   return (
     <Dialog open={open} onOpenChange={(next) => !assign.isPending && onOpenChange(next)}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Иконка: {name}</DialogTitle>
+          <DialogTitle>{s.iconOf(name)}</DialogTitle>
           <DialogDescription>{provider.id}</DialogDescription>
         </DialogHeader>
 
-        <div role="tablist" aria-label="Наборы иконок" className="flex flex-wrap gap-1">
+        <div role="tablist" aria-label={s.iconSets} className="flex flex-wrap gap-1">
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -180,16 +185,16 @@ export function IconPicker({
 
         {assign.error ? (
           <p role="alert" className="text-sm text-destructive">
-            Не сохранено: {errorMessage(assign.error)}
+            {s.notSaved(errorMessage(assign.error, language))}
           </p>
         ) : null}
 
         <DialogFooter>
           <Button variant="outline" disabled={assign.isPending} onClick={() => onOpenChange(false)}>
-            Отмена
+            {s.cancel}
           </Button>
           <Button disabled={!draft || assign.isPending} onClick={() => void save()}>
-            {assign.isPending ? "Сохранение…" : assign.error ? "Повторить" : "Сохранить"}
+            {assign.isPending ? s.saving : assign.error ? s.retry : s.save}
           </Button>
         </DialogFooter>
       </DialogContent>

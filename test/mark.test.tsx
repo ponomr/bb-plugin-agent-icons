@@ -7,9 +7,9 @@ import { resetIconsStore, setIconsState } from "../src/app/store";
 import { tintColor } from "../src/app/tint";
 import type { IconsState } from "../src/shared/contract";
 
-const empty: IconsState = { assignments: {}, sets: [], icons: {}, totalBytes: 0 };
+const empty: IconsState = { assignments: {}, sets: [], icons: {}, totalBytes: 0, language: "en" };
 const circle = { tag: "svg", attrs: { viewBox: "0 0 24 24", fill: "currentColor" }, children: [{ tag: "circle", attrs: { cx: "12", cy: "12", r: "9" }, children: [] }] };
-const alpha = { id: "acp-alpha", displayName: "Альфа", logoUrl: null, icon: { glyph: "Briefcase" }, strings: { iconTint: null } };
+const alpha = { id: "acp-alpha", displayName: "Alpha", logoUrl: null, icon: { glyph: "Briefcase" }, strings: { iconTint: null } };
 
 async function loadApp(cached: string[] = ["acp-alpha"]) {
   localStorage.setItem(IDS_KEY, JSON.stringify(cached));

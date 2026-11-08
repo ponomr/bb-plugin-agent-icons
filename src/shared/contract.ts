@@ -1,14 +1,15 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { LANGUAGES } from "./i18n";
 
 export const ICONS_TAG = "icons";
 
 /** bb accepts icon registrations only for ids of letters, digits, `-` and `_`. */
 export const PROVIDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
-export const providerIdSchema = z.string().regex(PROVIDER_ID_PATTERN, "недопустимый id провайдера");
-export const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "цвет должен быть в виде #rrggbb");
+export const providerIdSchema = z.string().regex(PROVIDER_ID_PATTERN, "invalid provider id");
+export const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "color must look like #rrggbb");
 const idSchema = z.string().min(1).max(128);
-const nameSchema = z.string().trim().min(1, "имя не может быть пустым").max(80, "имя длиннее 80 символов");
+const nameSchema = z.string().trim().min(1, "name cannot be empty").max(80, "name is longer than 80 characters");
 
 export const tintSchema = z.object({ light: colorSchema.optional(), dark: colorSchema.optional() });
 export const sourceSchema = z.union([
@@ -49,6 +50,8 @@ export const stateSchema = z.object({
   /** Trees of assigned set icons only, keyed `<setId>/<iconId>`. */
   icons: z.record(z.string(), iconTreeSchema),
   totalBytes: z.number(),
+  /** Display language from the plugin setting; the app falls back to English while loading. */
+  language: z.enum(LANGUAGES),
 });
 export type IconsState = z.infer<typeof stateSchema>;
 

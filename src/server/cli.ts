@@ -13,8 +13,10 @@ import {
 } from "@get-bb/plugin-sdk";
 import { colorSchema, iconRef, providerIdSchema, type Assignment, type IconSource, type IconsState } from "../shared/contract";
 import { BUILTIN_ICONS } from "../shared/builtin-icons";
-import { MAX_FILE_BYTES, tooLargeReason } from "../shared/limits";
+import { tooLargeReason, type Language } from "../shared/i18n";
+import { MAX_FILE_BYTES } from "../shared/limits";
 import type { IconStore, UploadFile } from "./state";
+import { strings, type Strings } from "./strings";
 
 export interface ProviderSummary {
   id: string;
@@ -30,10 +32,10 @@ async function guard<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-function parseColor(value: string | undefined, flag: string): string | undefined {
+function parseColor(value: string | undefined, flag: string, t: Strings): string | undefined {
   if (value === undefined) return undefined;
   const parsed = colorSchema.safeParse(value);
-  if (!parsed.success) throw new PluginCliError(`${flag}: цвет должен быть в виде #rrggbb`, { code: "invalid" });
+  if (!parsed.success) throw new PluginCliError(t.colorFormat(flag), { code: "invalid" });
   return parsed.data;
 }
 
@@ -44,10 +46,10 @@ function describeSource(source: IconSource, state: IconsState): string {
   return `${set?.name ?? source.set}/${icon?.name ?? source.icon}`;
 }
 
-function describe(assignment: Assignment, state: IconsState): string {
+function describe(assignment: Assignment, state: IconsState, t: Strings): string {
   const parts = [describeSource(assignment.source, state)];
-  if (assignment.tint?.light) parts.push(`светлая ${assignment.tint.light}`);
-  if (assignment.tint?.dark) parts.push(`тёмная ${assignment.tint.dark}`);
+  if (assignment.tint?.light) parts.push(t.tintLight(assignment.tint.light));
+  if (assignment.tint?.dark) parts.push(t.tintDark(assignment.tint.dark));
   return parts.join(", ");
 }
 
@@ -55,42 +57,43 @@ function formatList(
   state: IconsState,
   providers: ProviderSummary[] | null,
   iconNames: ReadonlyMap<string, string[]>,
+  t: Strings,
 ): string {
   const lines: string[] = [];
   const known = new Set(providers?.map((p) => p.id) ?? []);
   if (providers) {
-    lines.push("Провайдеры:");
+    lines.push(t.providersHeading);
     for (const p of providers) {
       const assignment = state.assignments[p.id];
-      lines.push(`  ${p.id} (${p.displayName}): ${assignment ? describe(assignment, state) : "исходная иконка"}`);
+      lines.push(`  ${p.id} (${p.displayName}): ${assignment ? describe(assignment, state, t) : t.originalIcon}`);
     }
   } else {
-    lines.push("Список провайдеров bb недоступен; показаны только назначения.");
+    lines.push(t.providersUnavailable);
   }
   const absent = Object.keys(state.assignments)
     .filter((id) => !known.has(id))
     .sort();
   if (absent.length > 0) {
-    lines.push(providers ? "Нет в bb:" : "Назначения:");
-    for (const id of absent) lines.push(`  ${id}: ${describe(state.assignments[id]!, state)}`);
+    lines.push(providers ? t.notInBb : t.assignmentsHeading);
+    for (const id of absent) lines.push(`  ${id}: ${describe(state.assignments[id]!, state, t)}`);
   }
-  lines.push("Наборы:");
-  if (state.sets.length === 0) lines.push("  нет");
+  lines.push(t.setsHeading);
+  if (state.sets.length === 0) lines.push(`  ${t.none}`);
   for (const s of state.sets) {
-    lines.push(`  ${s.name} (${s.id}): ${s.iconCount} икон., ${Math.ceil(s.bytes / 1024)} КБ`);
+    lines.push(`  ${t.setLine(s.name, s.id, s.iconCount, Math.ceil(s.bytes / 1024))}`);
     const names = iconNames.get(s.id) ?? [];
     if (names.length > 0) lines.push(`    ${names.join(", ")}`);
   }
-  lines.push(`Встроенные (builtin:<Имя>): ${BUILTIN_ICONS.join(", ")}`);
+  lines.push(t.builtinsLine(BUILTIN_ICONS.join(", ")));
   return lines.join("\n");
 }
 
-async function readSvgDir(dir: string): Promise<{ files: UploadFile[]; skipped: { fileName: string; reason: string }[] }> {
+async function readSvgDir(dir: string, language: Language): Promise<{ files: UploadFile[]; skipped: { fileName: string; reason: string }[] }> {
   let entries: string[];
   try {
     entries = await readdir(dir);
   } catch {
-    throw new PluginCliError(`папка не найдена: ${dir}`, { code: "not_found" });
+    throw new PluginCliError(strings(language).folderNotFound(dir), { code: "not_found" });
   }
   const files: UploadFile[] = [];
   const skipped: { fileName: string; reason: string }[] = [];
@@ -99,7 +102,7 @@ async function readSvgDir(dir: string): Promise<{ files: UploadFile[]; skipped: 
     const info = await stat(path);
     if (!info.isFile()) continue;
     if (info.size > MAX_FILE_BYTES) {
-      skipped.push({ fileName: name, reason: tooLargeReason(info.size) });
+      skipped.push({ fileName: name, reason: tooLargeReason(info.size, language) });
       continue;
     }
     files.push({ fileName: name, text: await readFile(path, "utf8") });
@@ -110,14 +113,15 @@ async function readSvgDir(dir: string): Promise<{ files: UploadFile[]; skipped: 
 export function createCli(store: IconStore, listProviders: () => Promise<ProviderSummary[]>): PluginCliRegistration {
   return defineCli({
     name: "agent-icons",
-    summary: "Иконки и цвета агентов в bb",
-    description: "Назначения общие для всех устройств; изменения видны сразу на открытых страницах bb.",
+    summary: "Agent icons and colors in bb",
+    description: "Assignments are shared by all devices; changes show at once on open bb pages.",
     commands: {
       list: cliCommand({
-        summary: "Показать провайдеров, их назначения и наборы иконок",
-        options: { json: { type: "boolean", description: "Вывести состояние в JSON" } },
+        summary: "Show providers, their assignments and icon sets",
+        options: { json: { type: "boolean", description: "Print the state as JSON" } },
         async run({ options }) {
           const state = await store.state();
+          const t = strings(state.language);
           let providers: ProviderSummary[] | null = null;
           try {
             providers = (await listProviders()).map((p) => ({ id: p.id, displayName: p.displayName }));
@@ -135,27 +139,28 @@ export function createCli(store: IconStore, listProviders: () => Promise<Provide
               stdout: JSON.stringify({ ...rest, sets: withNames, builtins: BUILTIN_ICONS, providers }, null, 2),
             };
           }
-          return { exitCode: 0, stdout: formatList(state, providers, iconNames) };
+          return { exitCode: 0, stdout: formatList(state, providers, iconNames, t) };
         },
       }),
 
       assign: cliCommand({
-        summary: "Назначить провайдеру иконку",
+        summary: "Assign an icon to a provider",
         description:
-          "Иконка: builtin:<Имя> (например builtin:Calendar) или <набор>/<иконка>, где набор и иконку можно указать по id или по имени.",
+          "Icon: builtin:<Name> (for example builtin:Calendar) or <set>/<icon>, where the set and the icon can be given by id or by name.",
         positionals: [
-          { name: "providerId", description: "id провайдера, например acp-beta", required: true },
-          { name: "icon", description: "builtin:<Имя> или <набор>/<иконка>", required: true },
+          { name: "providerId", description: "provider id, for example acp-beta", required: true },
+          { name: "icon", description: "builtin:<Name> or <set>/<icon>", required: true },
         ],
         options: {
-          light: { type: "string", description: "Цвет в светлой теме, #rrggbb", placeholder: "#hex" },
-          dark: { type: "string", description: "Цвет в тёмной теме, #rrggbb", placeholder: "#hex" },
+          light: { type: "string", description: "Color in the light theme, #rrggbb", placeholder: "#hex" },
+          dark: { type: "string", description: "Color in the dark theme, #rrggbb", placeholder: "#hex" },
         },
         async run({ positionals, options }) {
+          const t = strings(await store.language());
           const providerId = providerIdSchema.safeParse(positionals.providerId);
-          if (!providerId.success) throw new PluginCliError("недопустимый id провайдера", { code: "invalid" });
-          const light = parseColor(options.light, "--light");
-          const dark = parseColor(options.dark, "--dark");
+          if (!providerId.success) throw new PluginCliError(t.invalidProviderId, { code: "invalid" });
+          const light = parseColor(options.light, "--light", t);
+          const dark = parseColor(options.dark, "--dark", t);
           const ref = positionals.icon;
 
           let source: IconSource;
@@ -164,13 +169,13 @@ export function createCli(store: IconStore, listProviders: () => Promise<Provide
           } else {
             const slash = ref.indexOf("/");
             if (slash <= 0 || slash === ref.length - 1) {
-              throw new PluginCliError("иконка задаётся как builtin:<Имя> или <набор>/<иконка>", { code: "invalid" });
+              throw new PluginCliError(t.iconSyntax, { code: "invalid" });
             }
             const set = await store.resolveSet(ref.slice(0, slash));
-            if (!set) throw new PluginCliError(`набор «${ref.slice(0, slash)}» не найден`, { code: "not_found" });
+            if (!set) throw new PluginCliError(t.setNamedNotFound(ref.slice(0, slash)), { code: "not_found" });
             const iconId = await store.resolveIcon(set.id, ref.slice(slash + 1));
             if (!iconId) {
-              throw new PluginCliError(`иконки «${ref.slice(slash + 1)}» нет в наборе «${set.name}»`, { code: "not_found" });
+              throw new PluginCliError(t.iconNotInNamedSet(ref.slice(slash + 1), set.name), { code: "not_found" });
             }
             source = { set: set.id, icon: iconId };
           }
@@ -179,45 +184,48 @@ export function createCli(store: IconStore, listProviders: () => Promise<Provide
           await guard(() => store.assign(providerId.data, source, tint));
           return {
             exitCode: 0,
-            stdout: `${providerId.data}: назначено ${ref}. Если провайдер ещё не встречался на устройстве, перезагрузите страницу bb.`,
+            stdout: t.assigned(providerId.data, ref),
           };
         },
       }),
 
       clear: cliCommand({
-        summary: "Вернуть провайдеру его иконку",
-        positionals: [{ name: "providerId", description: "id провайдера", required: true }],
+        summary: "Restore the provider's own icon",
+        positionals: [{ name: "providerId", description: "provider id", required: true }],
         async run({ positionals }) {
+          const t = strings(await store.language());
           const { cleared } = await guard(() => store.clear(positionals.providerId));
           return {
             exitCode: 0,
-            stdout: cleared ? `${positionals.providerId}: назначение снято` : `${positionals.providerId}: назначения не было`,
+            stdout: cleared ? t.assignmentCleared(positionals.providerId) : t.noAssignment(positionals.providerId),
           };
         },
       }),
 
       "import-set": cliCommand({
-        summary: "Загрузить папку SVG как набор",
+        summary: "Import a folder of SVG files as a set",
         description:
-          "Создаёт набор с этим именем или дополняет существующий. Файл с тем же именем иконки заменяет её, назначения сохраняются.",
+          "Creates a set with this name or adds to an existing one. A file with the same icon name replaces that icon and keeps its assignments.",
         positionals: [
-          { name: "name", description: "Имя набора", required: true },
-          { name: "dir", description: "Папка с файлами .svg", required: true },
+          { name: "name", description: "Set name", required: true },
+          { name: "dir", description: "Folder with .svg files", required: true },
         ],
         async run({ positionals }, ctx) {
+          const language = await store.language();
+          const t = strings(language);
           const dir = resolve(ctx.cwd ?? process.cwd(), positionals.dir);
-          const { files, skipped } = await readSvgDir(dir);
+          const { files, skipped } = await readSvgDir(dir, language);
           if (files.length === 0 && skipped.length === 0) {
-            throw new PluginCliError(`в папке нет файлов .svg: ${dir}`, { code: "not_found" });
+            throw new PluginCliError(t.noSvgInFolder(dir), { code: "not_found" });
           }
           const name = positionals.name.trim();
-          if (!name) throw new PluginCliError("имя набора не может быть пустым", { code: "invalid" });
+          if (!name) throw new PluginCliError(t.emptySetName, { code: "invalid" });
           const existing = await store.resolveSet(name);
           const setId = existing?.id ?? (await guard(() => store.createSet(name))).setId;
           const result =
             files.length > 0 ? await guard(() => store.uploadIcons(setId, files)) : { accepted: [], rejected: [] };
           const rejected = [...skipped, ...result.rejected];
-          const lines = [`Набор «${existing?.name ?? name}»: принято ${result.accepted.length}, отклонено ${rejected.length}`];
+          const lines = [t.importSummary(existing?.name ?? name, result.accepted.length, rejected.length)];
           for (const r of rejected) lines.push(`  ${r.fileName}: ${r.reason}`);
           return { exitCode: result.accepted.length === 0 ? 1 : 0, stdout: lines.join("\n") };
         },

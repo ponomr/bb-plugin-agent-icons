@@ -8,18 +8,33 @@ the same icons.
 ## What it does
 
 - The plugin's settings page (Settings → Plugins → Agent Icons, section
-  «Иконки агентов») lists every provider with its current icon. For each one
+  "Agent icons") lists every provider with its current icon. For each one
   you choose an icon and, separately for the light and dark theme, a colour.
   A theme without a colour keeps the provider's original colour.
-- Codex and Claude Code logos can be replaced too. **Сбросить** returns the
+- Codex and Claude Code logos can be replaced too. **Reset** returns the
   original icon.
 - Assignments for providers that are not in BB right now stay listed under
-  «Нет в bb», so you can reset them.
+  "Not in bb", so you can reset them.
 - **Icon sets**: upload SVG files into a named set, rename sets and icons,
   delete them. Before deleting, the page names the providers that will get
   their original icon back.
 - Disabling the plugin restores every original icon. Providers themselves are
   never changed.
+
+## Language
+
+The interface is English by default. The BB SDK exposes no user locale, so the
+language is a plugin setting. To switch to Russian, use the settings form on
+the plugin page (`/settings/plugins/agent-icons`) or:
+
+```sh
+bb plugin config agent-icons set language ru   # "Русский"
+bb plugin config agent-icons set language en   # back to English
+```
+
+Open settings pages update without a reload and CLI output follows on the next
+call. The section title, the setting label and CLI help stay English in both
+modes. Stored data is not affected.
 
 ## Ready-made sets
 

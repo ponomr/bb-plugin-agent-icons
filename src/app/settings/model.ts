@@ -1,6 +1,8 @@
 /** Pure helpers of the settings page, kept apart from the components so tests can call them. */
 import { pointsAt, type IconsState } from "../../shared/contract";
-import { MAX_FILE_BYTES, MAX_ICONS_PER_SET, tooLargeReason, UPLOAD_BATCH_BYTES } from "../../shared/limits";
+import { tooLargeReason, type Language } from "../../shared/i18n";
+import { MAX_FILE_BYTES, MAX_ICONS_PER_SET, UPLOAD_BATCH_BYTES } from "../../shared/limits";
+import { strings } from "../strings";
 import type { ProviderRecord } from "../store";
 
 export function providerName(providers: readonly ProviderRecord[], id: string): string {
@@ -31,18 +33,18 @@ export interface UploadPlan {
 }
 
 /** Drops oversize files locally and splits the rest into RPC-sized batches. */
-export function planUpload(files: readonly PickedFile[]): UploadPlan {
+export function planUpload(files: readonly PickedFile[], language: Language): UploadPlan {
   const tooLarge: UploadPlan["tooLarge"] = [];
   const batches: PickedFile[][] = [];
   let batch: PickedFile[] = [];
   let bytes = 0;
   for (const file of files) {
     if (!/\.svg$/i.test(file.fileName)) {
-      tooLarge.push({ fileName: file.fileName, reason: "не SVG" });
+      tooLarge.push({ fileName: file.fileName, reason: strings(language).notSvg });
       continue;
     }
     if (file.size > MAX_FILE_BYTES) {
-      tooLarge.push({ fileName: file.fileName, reason: tooLargeReason(file.size) });
+      tooLarge.push({ fileName: file.fileName, reason: tooLargeReason(file.size, language) });
       continue;
     }
     if (batch.length > 0 && (bytes + file.size > UPLOAD_BATCH_BYTES || batch.length >= MAX_ICONS_PER_SET)) {
@@ -57,6 +59,6 @@ export function planUpload(files: readonly PickedFile[]): UploadPlan {
   return { batches, tooLarge };
 }
 
-export function errorMessage(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : "неизвестная ошибка";
+export function errorMessage(error: unknown, language: Language): string {
+  return error instanceof Error && error.message ? error.message : strings(language).unknownError;
 }

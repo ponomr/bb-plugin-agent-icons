@@ -2,12 +2,11 @@ import { experimental_useProviders, experimental_useRpcQuery } from "@get-bb/plu
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/card";
 import { iconsContract } from "../../shared/contract";
+import { DEFAULT_LANGUAGE } from "../../shared/i18n";
+import { LanguageProvider, strings } from "../strings";
 import { errorMessage } from "./model";
 import { needsReload, ProviderRow } from "./provider-row";
 import { SetsManager } from "./sets-manager";
-
-export const OTHER_DEVICES_NOTICE =
-  "Другим устройствам тоже нужна перезагрузка; если устройство было закрыто, может понадобиться две.";
 
 /** The plugin's settings page: providers with their icons, then the sets. */
 export function SettingsSection() {
@@ -15,43 +14,46 @@ export function SettingsSection() {
   const providers = experimental_useProviders();
 
   if (query.error && !query.data) {
+    const s = strings();
     return (
       <div className="flex flex-col items-start gap-2 text-sm" role="alert">
-        <p className="text-destructive">Не удалось загрузить назначения: {errorMessage(query.error)}</p>
+        <p className="text-destructive">{s.loadFailed(errorMessage(query.error, DEFAULT_LANGUAGE))}</p>
         <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
-          Повторить
+          {s.retry}
         </Button>
       </div>
     );
   }
   if (!query.data || providers.status === "loading") {
-    return <p className="text-sm text-muted-foreground">Загрузка…</p>;
+    return <p className="text-sm text-muted-foreground">{strings().loading}</p>;
   }
 
   const state = query.data;
+  const s = strings(state.language);
   const list = providers.status === "ready" ? providers.providers : [];
   const known = new Set(list.map((p) => p.id));
   const absent = Object.keys(state.assignments)
     .filter((id) => !known.has(id))
     .sort();
-  const absentTitle = providers.status === "ready" ? "Нет в bb" : "Назначения";
+  const absentTitle = providers.status === "ready" ? s.notInBb : s.assignmentsTitle;
   const reloadPending = Object.keys(state.assignments).some((id) => needsReload(id, state));
 
   return (
+    <LanguageProvider language={state.language}>
     <div className="flex flex-col gap-4">
       {reloadPending ? (
         <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-          {OTHER_DEVICES_NOTICE}
+          {s.otherDevicesNotice}
         </p>
       ) : null}
       <Card>
         <CardHeader>
-          <CardTitle>Провайдеры</CardTitle>
-          <CardDescription>Иконка и цвет для каждой темы. Без цвета иконка окрашивается как прежняя.</CardDescription>
+          <CardTitle>{s.providersTitle}</CardTitle>
+          <CardDescription>{s.providersDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           {providers.status === "error" ? (
-            <p className="text-sm text-destructive">Список провайдеров bb недоступен; показаны только назначения.</p>
+            <p className="text-sm text-destructive">{s.providersUnavailable}</p>
           ) : null}
           <ul className="divide-y divide-border">
             {list.map((provider) => (
@@ -72,13 +74,14 @@ export function SettingsSection() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Наборы иконок</CardTitle>
-          <CardDescription>Свои SVG, загруженные наборами. Код, ссылки и цвета из файлов удаляются.</CardDescription>
+          <CardTitle>{s.setsTitle}</CardTitle>
+          <CardDescription>{s.setsDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           <SetsManager state={state} providers={list} />
         </CardContent>
       </Card>
     </div>
+    </LanguageProvider>
   );
 }

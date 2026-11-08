@@ -22,14 +22,11 @@ import {
   type Tint,
   type UploadResult,
 } from "../shared/contract";
-import {
-  formatMegabytes,
-  KV_VALUE_MAX_BYTES,
-  MAX_ICONS_PER_SET,
-  MAX_TOTAL_BYTES,
-} from "../shared/limits";
+import { DEFAULT_LANGUAGE, formatMegabytes, type Language } from "../shared/i18n";
+import { KV_VALUE_MAX_BYTES, MAX_ICONS_PER_SET, MAX_TOTAL_BYTES } from "../shared/limits";
 import type { SvgNode } from "../shared/svg-allowlist";
 import { sanitizeSvg } from "./sanitize";
+import { strings, type Strings } from "./strings";
 
 const ASSIGNMENTS = "assignments";
 const SETS_INDEX = "sets:index";
@@ -79,13 +76,13 @@ function normalizeTint(tint: Tint | undefined): Tint | undefined {
   return result.light || result.dark ? result : undefined;
 }
 
-function requireIcon(record: SetRecord, iconId: string): SetRecord["icons"][string] {
-  if (!Object.hasOwn(record.icons, iconId)) refuse("not_found", "иконка не найдена в наборе");
+function requireIcon(record: SetRecord, iconId: string, t: Strings): SetRecord["icons"][string] {
+  if (!Object.hasOwn(record.icons, iconId)) refuse("not_found", t.iconNotInSet);
   return record.icons[iconId]!;
 }
 
 function sameName(a: string, b: string): boolean {
-  return a.localeCompare(b, "ru", { sensitivity: "accent" }) === 0;
+  return a.localeCompare(b, "en", { sensitivity: "accent" }) === 0;
 }
 
 export class IconStore {
@@ -94,6 +91,8 @@ export class IconStore {
   constructor(
     private readonly kv: PluginKvStorage,
     private readonly onChange: () => void,
+    /** Current display language; read per call so a setting change applies at once. */
+    readonly language: () => Promise<Language> = async () => DEFAULT_LANGUAGE,
   ) {}
 
   /** Read-modify-write cycles on shared keys must not interleave. */
@@ -117,9 +116,13 @@ export class IconStore {
     return (await this.kv.get<SetSummary[]>(SETS_INDEX)) ?? [];
   }
 
+  private async strings(): Promise<Strings> {
+    return strings(await this.language());
+  }
+
   private async setRecord(setId: string): Promise<SetRecord> {
     const record = await this.kv.get<SetRecord>(setKey(setId));
-    if (!record) refuse("not_found", "набор не найден");
+    if (!record) refuse("not_found", (await this.strings()).setNotFound);
     return record;
   }
 
@@ -147,7 +150,7 @@ export class IconStore {
   }
 
   async state(): Promise<IconsState> {
-    const [map, sets] = await Promise.all([this.assignments(), this.index()]);
+    const [map, sets, language] = await Promise.all([this.assignments(), this.index(), this.language()]);
     const assignments: Record<string, Assignment> = {};
     const setIcons = new Map<string, { set: string; icon: string }>();
     for (const [key, assignment] of Object.entries(map)) {
@@ -169,7 +172,7 @@ export class IconStore {
       const tree = trees[i];
       if (meta && tree) icons[ref] = { name: meta.name, tree };
     });
-    return { assignments, sets, icons, totalBytes: sets.reduce((sum, s) => sum + s.bytes, 0) };
+    return { assignments, sets, icons, totalBytes: sets.reduce((sum, s) => sum + s.bytes, 0), language };
   }
 
   async setIcons(setId: string): Promise<{ id: string; name: string; icons: SetIcon[] }> {
@@ -206,9 +209,9 @@ export class IconStore {
   assign(providerId: string, source: IconSource, tint?: Tint): Promise<{ providerId: string }> {
     return this.write(async () => {
       if ("builtin" in source) {
-        if (!isBuiltinIcon(source.builtin)) refuse("invalid", `встроенного значка ${source.builtin} нет`);
+        if (!isBuiltinIcon(source.builtin)) refuse("invalid", (await this.strings()).noBuiltinIcon(source.builtin));
       } else {
-        requireIcon(await this.setRecord(source.set), source.icon);
+        requireIcon(await this.setRecord(source.set), source.icon, await this.strings());
       }
       const map = await this.assignments();
       const assignment: Assignment = { source };
@@ -235,7 +238,7 @@ export class IconStore {
     return this.write(async () => {
       const trimmed = name.trim();
       const index = await this.index();
-      if (index.some((s) => sameName(s.name, trimmed))) refuse("conflict", `набор «${trimmed}» уже есть`);
+      if (index.some((s) => sameName(s.name, trimmed))) refuse("conflict", (await this.strings()).setExists(trimmed));
       const setId = `s${crypto.randomUUID().replace(/-/g, "").slice(0, 10)}`;
       await this.saveSet(setId, { name: trimmed, icons: {} }, index);
       return { setId };
@@ -248,7 +251,7 @@ export class IconStore {
       const record = await this.setRecord(setId);
       const index = await this.index();
       if (index.some((s) => s.id !== setId && sameName(s.name, trimmed))) {
-        refuse("conflict", `набор «${trimmed}» уже есть`);
+        refuse("conflict", (await this.strings()).setExists(trimmed));
       }
       await this.saveSet(setId, { ...record, name: trimmed }, index);
       return { setId };
@@ -263,12 +266,14 @@ export class IconStore {
     return this.write(async () => {
       const record = await this.setRecord(setId);
       const index = await this.index();
+      const language = await this.language();
+      const t = strings(language);
       let total = index.reduce((sum, s) => sum + s.bytes, 0);
       const result: UploadResult = { accepted: [], rejected: [] };
 
       for (const file of files) {
         const name = iconNameFromFile(file.fileName);
-        const sanitized = sanitizeSvg(file.text);
+        const sanitized = sanitizeSvg(file.text, language);
         if (!sanitized.ok) {
           result.rejected.push({ fileName: file.fileName, reason: sanitized.reason });
           continue;
@@ -278,18 +283,18 @@ export class IconStore {
         if (!existingId && Object.keys(record.icons).length >= MAX_ICONS_PER_SET) {
           result.rejected.push({
             fileName: file.fileName,
-            reason: `в наборе уже ${MAX_ICONS_PER_SET} иконок, это предел`,
+            reason: t.setFull(MAX_ICONS_PER_SET),
           });
           continue;
         }
         if (sanitized.bytes > KV_VALUE_MAX_BYTES - 1024) {
-          result.rejected.push({ fileName: file.fileName, reason: "иконка слишком сложная для хранения" });
+          result.rejected.push({ fileName: file.fileName, reason: t.iconTooComplex });
           continue;
         }
         if (total - previousBytes + sanitized.bytes > MAX_TOTAL_BYTES) {
           result.rejected.push({
             fileName: file.fileName,
-            reason: `нет места: занято ${formatMegabytes(total)} из ${formatMegabytes(MAX_TOTAL_BYTES)} МБ`,
+            reason: t.noSpace(formatMegabytes(total, language), formatMegabytes(MAX_TOTAL_BYTES, language)),
           });
           continue;
         }
@@ -315,9 +320,9 @@ export class IconStore {
     return this.write(async () => {
       const trimmed = name.trim();
       const record = await this.setRecord(setId);
-      const icon = requireIcon(record, iconId);
+      const icon = requireIcon(record, iconId, await this.strings());
       if (Object.entries(record.icons).some(([id, meta]) => id !== iconId && sameName(meta.name, trimmed))) {
-        refuse("conflict", `в наборе уже есть иконка «${trimmed}»`);
+        refuse("conflict", (await this.strings()).iconExists(trimmed));
       }
       icon.name = trimmed;
       await this.saveSet(setId, record, await this.index());
@@ -328,7 +333,7 @@ export class IconStore {
   deleteIcon(setId: string, iconId: string): Promise<{ affected: string[] }> {
     return this.write(async () => {
       const record = await this.setRecord(setId);
-      requireIcon(record, iconId);
+      requireIcon(record, iconId, await this.strings());
       const affected = await this.dropAssignments(setId, iconId);
       delete record.icons[iconId];
       await this.saveSet(setId, record, await this.index());

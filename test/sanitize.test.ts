@@ -65,7 +65,8 @@ describe("sanitizeSvg", () => {
 
   it("rejects a file with only an image as having no shapes", () => {
     const result = sanitizeSvg(fixture("image-only.svg"));
-    expect(result).toMatchObject({ ok: false, code: "no_shapes", reason: "нет фигур" });
+    expect(result).toMatchObject({ ok: false, code: "no_shapes", reason: "no shapes" });
+    expect(sanitizeSvg(fixture("image-only.svg"), "ru")).toMatchObject({ reason: "нет фигур" });
   });
 
   it("rejects broken XML", () => {
@@ -73,7 +74,9 @@ describe("sanitizeSvg", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("parse_error");
-      expect(result.reason).toContain("не удалось разобрать");
+      expect(result.reason).toContain("could not parse SVG: ");
+      const ru = sanitizeSvg(fixture("broken.svg"), "ru");
+      expect(ru.ok === false && ru.reason).toContain("не удалось разобрать SVG: ");
     }
   });
 
@@ -81,6 +84,8 @@ describe("sanitizeSvg", () => {
     const big = `<svg viewBox="0 0 1 1"><path d="${"M0 0".repeat(9000)}"/></svg>`;
     const result = sanitizeSvg(big);
     expect(result).toMatchObject({ ok: false, code: "too_large" });
+    expect(!result.ok && result.reason).toMatch(/^file larger than 32 KB \(\d+ KB\)$/);
+    expect(sanitizeSvg(big, "ru")).toMatchObject({ reason: expect.stringMatching(/^файл больше 32 КБ/) });
     // Not valid XML either; the size check must win.
     expect(sanitizeSvg(`<${"x".repeat(33 * 1024)}`)).toMatchObject({ code: "too_large" });
   });

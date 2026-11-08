@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Input } from "../../../components/ui/input";
 import { cn } from "../../../lib/utils";
+import { useStrings } from "../strings";
 
 export interface GridItem {
   id: string;
@@ -22,6 +23,7 @@ export function IconGrid({
   onSelect: (item: GridItem) => void;
   empty: string;
 }) {
+  const s = useStrings();
   const [filter, setFilter] = useState("");
   const shown = useMemo(() => {
     const needle = filter.trim().toLowerCase();
@@ -33,7 +35,7 @@ export function IconGrid({
   return (
     <div className="flex flex-col gap-2">
       {items.length > FILTER_FROM ? (
-        <Input aria-label="Фильтр по имени" placeholder="Фильтр по имени" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <Input aria-label={s.filterByName} placeholder={s.filterByName} value={filter} onChange={(e) => setFilter(e.target.value)} />
       ) : null}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] gap-1">
         {shown.map((item) => (
@@ -53,7 +55,7 @@ export function IconGrid({
           </button>
         ))}
       </div>
-      {shown.length === 0 ? <p className="text-center text-sm text-muted-foreground">Ничего не найдено</p> : null}
+      {shown.length === 0 ? <p className="text-center text-sm text-muted-foreground">{s.nothingFound}</p> : null}
     </div>
   );
 }
